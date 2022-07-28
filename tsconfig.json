@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": ["./tasks", "./src", "./test", "./typechain", "./abi/**/*.json", "./files/*.json"],
+  "exclude": ["./test/foundry/**"],
+  "files": ["./hardhat.config.ts"]
+}
