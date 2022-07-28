@@ -26,7 +26,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - run: ls -lah ./abi/contracts/**/*
-      - run: yarn
+      - run: yarn install --ignore-scripts
       - run: yarn build
       - name: Run contract tests
         run: yarn test

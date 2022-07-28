@@ -2,7 +2,8 @@
   "name": "mosaics-contracts",
   "version": "1.0.0",
   "description": "Mosaics solidity contracts",
-  "main": "index.js",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
   "scripts": {
     "clean": "rimraf dist tsconfig.build.tsbuildinfo",
     "build": "yarn build:abi && yarn build:sol --force && yarn build:ts && yarn build:declarations",
@@ -28,7 +29,7 @@
   },
   "author": "Okami Labs",
   "homepage": "https://okami.wtf/",
-  "license": "ISC",
+  "license": "GPL-3.0",
   "bugs": {
     "url": "https://github.com/okami-labs/mosaics-contracts/issues"
   },
