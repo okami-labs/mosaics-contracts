@@ -27,9 +27,13 @@ contract MosaicsToken is ERC721ABurnable, Ownable {
     uint256 private _currentMosaicId;
 
     // IPFS content hash of the contract-level metadata
-    string private _contractURIHash = '0x';
+    string private _contractURIHash = 'QmX6FPXtrS7nPodsevxgucu2oPhNXKPnob7YESzZDKiRQ5';
 
-    IProxyRegistry public immutable proxyRegistry;
+    // IPFS hash of the default mosaic image, before the auction ends.
+    string private _defaultMosaicURIHash = '';
+
+    // IPFS hashes of the mosaic images, set by the owner after the auction ends.
+    string[] private _mosaicURIHashes;
 
     event MosaicCreated(uint256 indexed tokenId);
 
@@ -41,16 +45,25 @@ contract MosaicsToken is ERC721ABurnable, Ownable {
 
     event MinterLocked();
 
+    /**
+     * @notice Require that the minter has not been locked.
+     */
     modifier whenMinterNotLocked() {
         require(!isMinterLocked, 'Minter is locked');
         _;
     }
 
+    /**
+     * @notice Require that the sender is the Mosaics DAO.
+     */
     modifier onlyMosaicsDAO() {
-        require(msg.sender == mosaicsDAO, 'Sender is not the mosaics DAO');
+        require(msg.sender == mosaicsDAO, 'Sender is not the Mosaics DAO');
         _;
     }
 
+    /**
+     * @notice Require that the sender is the minter.
+     */
     modifier onlyMinter() {
         require(msg.sender == minter, 'Sender is not the minter');
         _;
@@ -59,70 +72,100 @@ contract MosaicsToken is ERC721ABurnable, Ownable {
     constructor(
         address _mosaicsDAO,
         address _minter,
-        address _okamiLabs,
-        IProxyRegistry _proxyRegistry
+        address _okamiLabs
     ) ERC721A('Mosaics', 'MOSAIC') {
         mosaicsDAO = _mosaicsDAO;
         okamiLabs = _okamiLabs;
         minter = _minter;
-        proxyRegistry = _proxyRegistry;
     }
 
+    /**
+     * @notice The IPFS URI of the contract-level metadata.
+     */
     function contractURI() public view returns (string memory) {
         return string(abi.encodePacked('ipfs://', _contractURIHash));
     }
 
+    /**
+     * @notice Set the _contractURIHash.
+     * @dev Only callable by the owner.
+     */
     function setContractURIHash(string memory newContractURIHash) external onlyOwner {
         _contractURIHash = newContractURIHash;
     }
 
-    function isApprovedForAll(address _owner, address _operator)
-        public
-        view
-        override(IERC721A, ERC721A)
-        returns (bool)
-    {
-        // whitelist proxy contract for easy trading
-        if (proxyRegistry.proxies(_owner) == _operator) {
-            return true;
-        }
-
-        return super.isApprovedForAll(_owner, _operator);
-    }
-
+    /**
+     * @notice Mint a new Mosaic.
+     * @dev Only callable by the minter.
+     */
     function mint() public onlyMinter returns (uint256) {
         _mint(minter, _currentMosaicId++);
+        _mosaicURIHashes.push(_defaultMosaicURIHash);
         emit MosaicCreated(_currentMosaicId);
 
         return _currentMosaicId;
     }
 
+    /**
+     * @notice Burn the mosaicId token.
+     * @dev Only callable by the minter.
+     */
     function burn(uint256 mosaicId) public override onlyMinter {
+        require(_exists(mosaicId), 'MosaicsToken: This is a non-existent Mosaic token');
         _burn(mosaicId);
         emit MosaicBurned(mosaicId);
     }
 
+    /**
+     * @notice A distinct Uniform Resource Identifier (URI) for a given asset.
+     * @dev See {IERC721Metadata-tokenURI}.
+     */
     function tokenURI(uint256 tokenId) public view override(IERC721A, ERC721A) returns (string memory) {
-        require(_exists(tokenId), 'MosaicsToken: URI query for nonexistent token');
-        // TODO: implement token uri
-        // return string(abi.encodePacked('ipfs://', _tokenURIHash(tokenId)));
-        return '';
+        require(_exists(tokenId), 'MosaicsToken: URI query for non-existent token');
+        return string(abi.encodePacked('ipfs://', _mosaicURIHashes[tokenId]));
     }
 
-    // dataURI required?
+    /**
+     * @notice Set the URI of a given mosaic.
+     * @dev Only callable by the owner.
+     */
+    function setMosaicURIHash(uint256 tokenId, string memory mosaicURIHash) external onlyOwner {
+        require(_exists(tokenId), 'MosaicsToken: This is a non-existent Mosaic token');
+        _mosaicURIHashes[tokenId] = mosaicURIHash;
+    }
 
+    /**
+     * @notice Set the default URI for mosaics.
+     * @dev Only callable by the owner.
+     */
+    function setDefaultMosaicURIHash(string memory defaultMosaicURIHash) external onlyOwner {
+        _defaultMosaicURIHash = defaultMosaicURIHash;
+    }
+
+    /**
+     * @notice Set the Mosaics DAO.
+     * @dev Only callable by the Mosaics DAO.
+     */
     function setMosaicsDAO(address _mosaicsDAO) external onlyMosaicsDAO {
         mosaicsDAO = _mosaicsDAO;
 
         emit MosaicsDAOUpdated(_mosaicsDAO);
     }
 
+    /**
+     * @notice Set the minter.
+     * @dev Only callable by the owner when minter is not locked.
+     */
     function setMinter(address _minter) external onlyOwner whenMinterNotLocked {
         minter = _minter;
 
         emit MinterUpdated(_minter);
     }
 
+    /**
+     * @notice Lock the minter.
+     * @dev Only callable by the owner.
+     */
     function lockMinter() external onlyOwner whenMinterNotLocked {
         isMinterLocked = true;
 
