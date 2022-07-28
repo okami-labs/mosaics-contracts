@@ -1,8 +1,8 @@
 {
   "name": "Mosaics",
   "description": "One Mosaic, every day, forever.\r\n\r\nmosaics.wtf",
-  "image": "ipfs://<replace>",
+  "image": "ipfs://QmbaDupPhw2QuumcktGdW5e4tHniREcKCymR2VDDLcVEpg",
   "external_link": "https://mosaics.wtf",
   "seller_fee_basis_points": 0,
-  "fee_recipient": "0x<replace>"
+  "fee_recipient": "0xc327B16C33fdd558C1ad7DaaFf1a4081E91049f3"
 }
