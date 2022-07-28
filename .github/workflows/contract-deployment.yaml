@@ -8,11 +8,9 @@ on:
 jobs:
   build_and_test:
     name: Build and Test
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-        with:
-          token: ${{ secrets.GH_RUNNER_PAT }}
       - name: Use Node.js 14.x
         uses: actions/setup-node@v1
         with:
