@@ -25,7 +25,7 @@ jobs:
           node-version: 14.x
       - name: Install Yarn
         run: npm install -g yarn
-      - run: ls -lah
+      - run: ls -lah ./abi
       - run: yarn
       - run: yarn build
       - name: Run contract tests
