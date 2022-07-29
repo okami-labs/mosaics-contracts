@@ -22,7 +22,7 @@
     "strict": true,
     "strictNullChecks": true,
     "target": "es6",
-    "baseUrl": ".",
+    "baseUrl": "."
   },
   "exclude": ["**/dist"]
 }
