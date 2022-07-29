@@ -1,11 +1,10 @@
 /// SPDX-License-Identifier: GPL-3.0
 
-/// @title The Mosaics ERC-721 Token
+/// @title The Mosaics ERC-721A Token
 
 pragma solidity ^0.8.6;
 
 import { Ownable } from '@openzeppelin/contracts/access/Ownable.sol';
-import { IProxyRegistry } from './external/opensea/IProxyRegistry.sol';
 import 'erc721a/contracts/extensions/ERC721ABurnable.sol';
 import 'erc721a/contracts/IERC721A.sol';
 import 'erc721a/contracts/ERC721A.sol';
@@ -22,9 +21,6 @@ contract MosaicsToken is ERC721ABurnable, Ownable {
 
     // Whether the minter can be updated
     bool public isMinterLocked;
-
-    // The internal mosaic ID tracker
-    uint256 private _currentMosaicId;
 
     // IPFS content hash of the contract-level metadata
     string private _contractURIHash = 'QmX6FPXtrS7nPodsevxgucu2oPhNXKPnob7YESzZDKiRQ5';
@@ -99,11 +95,12 @@ contract MosaicsToken is ERC721ABurnable, Ownable {
      * @dev Only callable by the minter.
      */
     function mint() public onlyMinter returns (uint256) {
-        _mint(minter, _currentMosaicId++);
+        uint256 tokenId = _nextTokenId();
+        _mint(minter, 1);
         _mosaicURIHashes.push(_defaultMosaicURIHash);
-        emit MosaicCreated(_currentMosaicId);
+        emit MosaicCreated(tokenId);
 
-        return _currentMosaicId;
+        return tokenId;
     }
 
     /**
