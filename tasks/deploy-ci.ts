@@ -11,7 +11,7 @@ task('deploy-ci', 'Deploy contracts (automated by CI)')
     const [deployer] = await ethers.getSigners();
     const contracts = await run('deploy', {
       weth,
-      deployer: deployer.address,
+      mosaicsDAO: deployer.address,
     });
 
     if (!fs.existsSync('logs')) {
