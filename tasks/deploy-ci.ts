@@ -12,6 +12,7 @@ task('deploy-ci', 'Deploy contracts (automated by CI)')
     const contracts = await run('deploy', {
       weth,
       mosaicsDAO: deployer.address,
+      autoDeploy: true,
     });
 
     if (!fs.existsSync('logs')) {
