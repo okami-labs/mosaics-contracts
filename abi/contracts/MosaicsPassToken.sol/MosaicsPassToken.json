@@ -40,7 +40,7 @@
   "function setAllowList(address[],uint32[])",
   "function setApprovalForAll(address,bool)",
   "function setBaseURI(string)",
-  "function setContractURIHash(string)",
+  "function setContractURI(string)",
   "function setSaleConfig(uint32,uint64,uint32,uint32,uint64)",
   "function supportsInterface(bytes4) view returns (bool)",
   "function symbol() view returns (string)",

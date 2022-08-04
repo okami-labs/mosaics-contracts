@@ -1,9 +1,9 @@
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import chai from 'chai'
-import { solidity } from 'ethereum-waffle'
-import { ethers } from 'hardhat'
-import { MosaicsToken } from '../typechain'
-import { deployMosaicsToken } from './utils'
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import chai from 'chai';
+import { solidity } from 'ethereum-waffle';
+import { ethers } from 'hardhat';
+import { MosaicsToken } from '../typechain';
+import { deployMosaicsToken } from './utils';
 
 chai.use(solidity);
 const { expect } = chai;
@@ -39,7 +39,9 @@ describe('MosaicsPassToken', () => {
 
   describe('contractURI', async () => {
     it('should return correct contractURI', async () => {
-      expect(await mosaicsToken.contractURI()).to.eq('ipfs://QmX6FPXtrS7nPodsevxgucu2oPhNXKPnob7YESzZDKiRQ5');
+      expect(await mosaicsToken.contractURI()).to.eq(
+        'ipfs://QmX6FPXtrS7nPodsevxgucu2oPhNXKPnob7YESzZDKiRQ5',
+      );
     });
   });
 });
