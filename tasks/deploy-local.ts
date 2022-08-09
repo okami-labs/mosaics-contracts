@@ -1,6 +1,6 @@
-import { Contract as EthersContract } from 'ethers';
-import { task, types } from 'hardhat/config';
-import { ContractName } from './types';
+import { Contract as EthersContract } from 'ethers'
+import { task, types } from 'hardhat/config'
+import { ContractName } from './types'
 
 type LocalContractName = ContractName | 'WETH';
 

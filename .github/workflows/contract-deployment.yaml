@@ -50,10 +50,10 @@ jobs:
         run: |
           echo "Giving Etherscan time to index"
           sleep 60 # This could be replaced by polling etherscan on that address, wait for non-404
-          npx hardhat verify --network rinkeby `cat logs/deploy.json| jq -r '.contractAddress'`
+          npx hardhat verify --network rinkeby `cat logs/deploy.json| jq -r '.contractAddresses'`
       - name: Look here for contract info
         run: |
-          echo "Contract deployed on Rinkeby to `cat logs/deploy.json| jq -r '.contractAddress'`"
+          echo "Contract deployed on Rinkeby to `cat logs/deploy.json| jq -r '.contractAddresses'`"
       - name: Uninstall Yarn
         if: always()
         run: npm uninstall -g yarn

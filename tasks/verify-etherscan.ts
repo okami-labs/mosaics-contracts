@@ -22,6 +22,9 @@ task('verify-etherscan', 'Verify the Solidity contracts on Etherscan')
           );
           await contract.instance?.deployed();
         }
+
+        console.log(contract)
+
         await hre.run('verify:verify', {
           ...contract,
         //   contract: nameToFullyQualifiedName[contract.name],

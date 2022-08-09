@@ -1,9 +1,9 @@
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import chai from 'chai';
-import { solidity } from 'ethereum-waffle';
-import { ethers } from 'hardhat';
-import { MosaicsToken } from '../typechain';
-import { deployMosaicsToken } from './utils';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import chai from 'chai'
+import { solidity } from 'ethereum-waffle'
+import { ethers } from 'hardhat'
+import { MosaicsToken } from '../typechain'
+import { deployMosaicsToken } from './utils'
 
 chai.use(solidity);
 const { expect } = chai;
@@ -18,7 +18,7 @@ describe('MosaicsPassToken', () => {
 
   before(async () => {
     [deployer, mosaicsDAO, auctionHouse, okamiLabs] = await ethers.getSigners();
-    mosaicsToken = await deployMosaicsToken(deployer, mosaicsDAO, auctionHouse, okamiLabs);
+    mosaicsToken = await deployMosaicsToken(deployer, mosaicsDAO.address, auctionHouse.address, okamiLabs.address);
   });
 
   beforeEach(async () => {

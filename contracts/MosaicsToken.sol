@@ -1,15 +1,25 @@
 /// SPDX-License-Identifier: GPL-3.0
 
-/// @title The Mosaics ERC-721A Token
+/// @title The Mosaics ERC-721 Token
+
+/******************************
+ * ░░░░░░░░░░░░░░░░░░░░░░░░░░ *
+ * ░░░░░░░████░░░░████░░░░░░░ *
+ * ░░░░░░░████░░░░████░░░░░░░ *
+ * ░░░████░░░░████░░░░████░░░ *
+ * ░░░████░░░░████░░░░████░░░ *
+ * ░░░░░░░░░░░░░░░░░░░░░░░░░░ *
+ *****************************/
 
 pragma solidity ^0.8.6;
 
 import { Ownable } from '@openzeppelin/contracts/access/Ownable.sol';
-import 'erc721a/contracts/extensions/ERC721ABurnable.sol';
-import 'erc721a/contracts/IERC721A.sol';
-import 'erc721a/contracts/ERC721A.sol';
+import { IMosaicsToken } from './interfaces/IMosaicsToken.sol';
+import { ERC721 } from '@openzeppelin/contracts/token/ERC721/ERC721.sol';
+import { IERC721 } from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
+import { ERC721URIStorage } from '@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol';
 
-contract MosaicsToken is ERC721ABurnable, Ownable {
+contract MosaicsToken is IMosaicsToken, Ownable, ERC721URIStorage {
     // The mosaics DAO address
     address public mosaicsDAO;
 
@@ -26,26 +36,19 @@ contract MosaicsToken is ERC721ABurnable, Ownable {
     string private _contractURIHash = 'QmX6FPXtrS7nPodsevxgucu2oPhNXKPnob7YESzZDKiRQ5';
 
     // IPFS hash of the default mosaic image, before the auction ends.
-    string private _defaultMosaicURIHash = '';
+    string private _defaultMosaicURIHash = 'QmX6FPXtrS7nPodsevxgucu2oPhNXKPnob7YESzZDKiRQ5'; // TODO: Update this
 
     // IPFS hashes of the mosaic images, set by the owner after the auction ends.
-    string[] private _mosaicURIHashes;
+    mapping(uint256 => string) public mosaics;
 
-    event MosaicCreated(uint256 indexed tokenId);
-
-    event MosaicBurned(uint256 indexed tokenId);
-
-    event MosaicsDAOUpdated(address mosaicsDAO);
-
-    event MinterUpdated(address minter);
-
-    event MinterLocked();
+    // The internal mosaic ID tracker
+    uint256 private _currentMosaicId;
 
     /**
      * @notice Require that the minter has not been locked.
      */
     modifier whenMinterNotLocked() {
-        require(!isMinterLocked, 'Minter is locked');
+        require(!isMinterLocked, 'MosaicsToken: Minter is locked');
         _;
     }
 
@@ -53,7 +56,12 @@ contract MosaicsToken is ERC721ABurnable, Ownable {
      * @notice Require that the sender is the Mosaics DAO.
      */
     modifier onlyMosaicsDAO() {
-        require(msg.sender == mosaicsDAO, 'Sender is not the Mosaics DAO');
+        require(msg.sender == mosaicsDAO, 'MosaicsToken: Sender is not the Mosaics DAO');
+        _;
+    }
+
+    modifier onlyOkamiLabs() {
+        require(msg.sender == okamiLabs, 'MosaicsToken: Sender is not Okami Labs');
         _;
     }
 
@@ -61,7 +69,7 @@ contract MosaicsToken is ERC721ABurnable, Ownable {
      * @notice Require that the sender is the minter.
      */
     modifier onlyMinter() {
-        require(msg.sender == minter, 'Sender is not the minter');
+        require(msg.sender == minter, 'MosaicsToken: Sender is not the minter');
         _;
     }
 
@@ -69,10 +77,10 @@ contract MosaicsToken is ERC721ABurnable, Ownable {
         address _mosaicsDAO,
         address _minter,
         address _okamiLabs
-    ) ERC721A('Mosaics', 'MOSAIC') {
+    ) ERC721('Mosaics', 'MOSAIC') {
         mosaicsDAO = _mosaicsDAO;
-        okamiLabs = _okamiLabs;
         minter = _minter;
+        okamiLabs = _okamiLabs;
     }
 
     /**
@@ -94,13 +102,8 @@ contract MosaicsToken is ERC721ABurnable, Ownable {
      * @notice Mint a new Mosaic.
      * @dev Only callable by the minter.
      */
-    function mint() public onlyMinter returns (uint256) {
-        uint256 tokenId = _nextTokenId();
-        _mint(minter, 1);
-        _mosaicURIHashes.push(_defaultMosaicURIHash);
-        emit MosaicCreated(tokenId);
-
-        return tokenId;
+    function mint() public override onlyMinter returns (uint256) {
+        return _mintTo(minter, _currentMosaicId++);
     }
 
     /**
@@ -108,7 +111,6 @@ contract MosaicsToken is ERC721ABurnable, Ownable {
      * @dev Only callable by the minter.
      */
     function burn(uint256 mosaicId) public override onlyMinter {
-        require(_exists(mosaicId), 'MosaicsToken: This is a non-existent Mosaic token');
         _burn(mosaicId);
         emit MosaicBurned(mosaicId);
     }
@@ -117,18 +119,18 @@ contract MosaicsToken is ERC721ABurnable, Ownable {
      * @notice A distinct Uniform Resource Identifier (URI) for a given asset.
      * @dev See {IERC721Metadata-tokenURI}.
      */
-    function tokenURI(uint256 tokenId) public view override(IERC721A, ERC721A) returns (string memory) {
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
         require(_exists(tokenId), 'MosaicsToken: URI query for non-existent token');
-        return string(abi.encodePacked('ipfs://', _mosaicURIHashes[tokenId]));
+        return string(abi.encodePacked('ipfs://', mosaics[tokenId]));
     }
 
     /**
      * @notice Set the URI of a given mosaic.
      * @dev Only callable by the owner.
      */
-    function setMosaicURIHash(uint256 tokenId, string memory mosaicURIHash) external onlyOwner {
+    function setMosaicURIHash(uint256 tokenId, string memory mosaicURIHash) external onlyOkamiLabs {
         require(_exists(tokenId), 'MosaicsToken: This is a non-existent Mosaic token');
-        _mosaicURIHashes[tokenId] = mosaicURIHash;
+        mosaics[tokenId] = mosaicURIHash;
     }
 
     /**
@@ -167,5 +169,17 @@ contract MosaicsToken is ERC721ABurnable, Ownable {
         isMinterLocked = true;
 
         emit MinterLocked();
+    }
+
+    /**
+     * @notice Mint a Mosaic with `mosaicId` to the provided `to` address.
+     */
+    function _mintTo(address to, uint256 mosaicId) internal returns (uint256) {
+        mosaics[mosaicId] = _defaultMosaicURIHash;
+
+        _mint(to, mosaicId);
+        emit MosaicCreated(mosaicId);
+
+        return mosaicId;
     }
 }
