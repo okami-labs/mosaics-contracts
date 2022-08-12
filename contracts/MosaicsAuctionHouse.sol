@@ -57,7 +57,7 @@ contract MosaicsAuctionHouse is
 
     /**
      * @notice Initialize the auction house and base contracts,
-     * populate configuration values, and pause the contract.._
+     * populate configuration values, and pause the contract...
      * @dev This function can only be called once.
      */
     function initialize(

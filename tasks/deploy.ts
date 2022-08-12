@@ -1,5 +1,7 @@
+import { Interface } from 'ethers/lib/utils';
 import { task, types } from 'hardhat/config';
 import promptjs from 'prompt';
+import { default as MosaicsAuctionHouseABI } from '../abi/contracts/MosaicsAuctionHouse.sol/MosaicsAuctionHouse.json';
 import { ChainId, ContractDeployment, ContractName, DeployedContract } from './types';
 
 promptjs.colors = false;
@@ -17,6 +19,31 @@ task('deploy', 'Deploy Mosaics Contracts')
   .addFlag('autoDeploy', 'Deploy all contracts without user interaction')
   .addOptionalParam('weth', 'The WETH contract address', undefined, types.string)
   .addOptionalParam('mosaicsDAO', 'The deployer address', undefined, types.string)
+  .addOptionalParam('okamiLabs', 'The Okami Labs address', undefined, types.string)
+  .addOptionalParam(
+    'auctionTimeBuffer',
+    'The auction time buffer (seconds)',
+    5 * 60 /* 5 minutes */,
+    types.int,
+  )
+  .addOptionalParam(
+    'auctionReservePrice',
+    'The auction reserve price (wei)',
+    1 /* 1 wei */,
+    types.int,
+  )
+  .addOptionalParam(
+    'auctionMinIncrementBidPercentage',
+    'The minimum increment bid percentage (out of 100)',
+    2 /* 2% */,
+    types.int,
+  )
+  .addOptionalParam(
+    'auctionDuration',
+    'The auction duration (seconds)',
+    60 * 60 * 24 /* 1 day */,
+    types.int,
+  )
   .setAction(async (args, { ethers }) => {
     const network = await ethers.provider.getNetwork();
     const [deployer] = await ethers.getSigners();
@@ -24,6 +51,11 @@ task('deploy', 'Deploy Mosaics Contracts')
     if (!args.mosaicsDAO) {
       console.log(`Mosaics DAO address not provided. Setting to deployer (${deployer.address})...`);
       args.mosaicsDAO = deployer.address;
+    }
+
+    if (!args.okamiLabs) {
+      console.log(`Okami Labs address not provided. Setting to deployer (${deployer.address})...`);
+      args.okamiLabs = deployer.address;
     }
 
     if (!args.weth) {
@@ -36,20 +68,54 @@ task('deploy', 'Deploy Mosaics Contracts')
       args.weth = deployedWETHContract;
     }
 
+    const nonce = await deployer.getTransactionCount();
+
+    const AUCTION_HOUSE_PROXY_NONCE_OFFSET = 4;
+
+    const expectedAuctionHouseProxyAddress = ethers.utils.getContractAddress({
+      from: deployer.address,
+      nonce: nonce + AUCTION_HOUSE_PROXY_NONCE_OFFSET,
+    });
+
     const deployment: Record<ContractName, DeployedContract> = {} as Record<
       ContractName,
       DeployedContract
     >;
     const contracts: Record<ContractName, ContractDeployment> = {
       MosaicsPassToken: {
-        args: [1_000, 50, deployer.address], // TODO: change to OkamiLabs address
+        args: [1_000, 50, args.okamiLabs],
       },
       MosaicsToken: {
+        args: [args.mosaicsDAO, expectedAuctionHouseProxyAddress, args.okamiLabs],
+      },
+      MosaicsAuctionHouse: {
+        waitForConfirmation: true,
+      },
+      MosaicsAuctionHouseProxyAdmin: {},
+      MosaicsAuctionHouseProxy: {
         args: [
-          deployer.address, // TODO: change to MosaicsDAO address
-          deployer.address, // minter - TODO: change to auction house address
-          deployer.address, // TODO: change to OkamiLabs address
+          () => deployment.MosaicsAuctionHouse.address,
+          () => deployment.MosaicsAuctionHouseProxyAdmin.address,
+          () =>
+            new Interface(MosaicsAuctionHouseABI).encodeFunctionData('initialize', [
+              deployment.MosaicsToken.address,
+              args.weth,
+              args.auctionTimeBuffer,
+              args.auctionReservePrice,
+              args.auctionMinIncrementBidPercentage,
+              args.auctionDuration,
+            ]),
         ],
+        waitForConfirmation: true,
+        validateDeployment: () => {
+          const expected = expectedAuctionHouseProxyAddress.toLowerCase();
+          const actual = deployment.MosaicsAuctionHouseProxy.address.toLowerCase();
+          if (expected !== actual) {
+            throw new Error(
+              `Auction House Proxy address mismatch. Expected ${expected}, got ${actual}`,
+            );
+          }
+        },
       },
     };
 

@@ -8,7 +8,7 @@ export enum ChainId {
 }
 
 // prettier-ignore
-export type ContractName = 'MosaicsPassToken' | 'MosaicsToken';
+export type ContractName = 'MosaicsPassToken' | 'MosaicsToken' | 'MosaicsAuctionHouse' | 'MosaicsAuctionHouseProxy' | 'MosaicsAuctionHouseProxyAdmin';
 
 export interface ContractDeployment {
   args?: (string | number | (() => string))[];

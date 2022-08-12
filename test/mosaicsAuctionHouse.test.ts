@@ -1,15 +1,15 @@
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import chai from 'chai'
-import { solidity } from 'ethereum-waffle'
-import { constants } from 'ethers'
-import { ethers, upgrades } from 'hardhat'
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import chai from 'chai';
+import { solidity } from 'ethereum-waffle';
+import { constants } from 'ethers';
+import { ethers, upgrades } from 'hardhat';
 import {
   MaliciousBidder__factory as MaliciousBidderFactory,
   MosaicsAuctionHouse,
   MosaicsToken,
-  WETH
-} from '../typechain'
-import { deployMosaicsToken, deployWeth } from './utils'
+  WETH,
+} from '../typechain';
+import { deployMosaicsToken, deployWeth } from './utils';
 
 chai.use(solidity);
 const { expect } = chai;
@@ -225,12 +225,8 @@ describe('MosaicsAuctionHouse', () => {
     const receipt = await tx.wait();
     const { timestamp } = await ethers.provider.getBlock(receipt.blockHash);
 
-    const settledEvent = receipt.events?.find(
-      e => e.event === 'AuctionSettled',
-    );
-    const createdEvent = receipt.events?.find(
-      e => e.event === 'AuctionCreated',
-    );
+    const settledEvent = receipt.events?.find(e => e.event === 'AuctionSettled');
+    const createdEvent = receipt.events?.find(e => e.event === 'AuctionCreated');
 
     expect(settledEvent?.args?.mosaicId).to.equal(mosaicId);
     expect(settledEvent?.args?.winner).to.equal(bidderA.address);
@@ -276,9 +272,7 @@ describe('MosaicsAuctionHouse', () => {
     const receipt = await unpauseTx.wait();
     const { timestamp } = await ethers.provider.getBlock(receipt.blockHash);
 
-    const createdEvent = receipt.events?.find(
-      e => e.event === 'AuctionCreated',
-    );
+    const createdEvent = receipt.events?.find(e => e.event === 'AuctionCreated');
 
     expect(createdEvent?.args?.mosaicId).to.equal(mosaicId.add(1));
     expect(createdEvent?.args?.startTime).to.equal(timestamp);

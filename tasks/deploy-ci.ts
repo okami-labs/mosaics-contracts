@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { task } from 'hardhat/config';
 import { ContractName, DeployedContract } from './types';
 
@@ -14,10 +15,11 @@ task('deploy-ci', 'Deploy contracts (automated by CI)')
     '0xc778417e063141139fce010982780140aa0cd5ab',
   )
   .setAction(async ({ weth }, { ethers, run }) => {
-    const [deployer] = await ethers.getSigners();
+    const [mosaicsDAO, okamiLabs] = await ethers.getSigners();
     const contracts: Record<ContractName, DeployedContract> = await run('deploy', {
       weth,
-      mosaicsDAO: deployer.address,
+      mosaicsDAO: mosaicsDAO.address,
+      okamiLabs: okamiLabs.address,
       autoDeploy: true,
     });
 
@@ -33,25 +35,33 @@ task('deploy-ci', 'Deploy contracts (automated by CI)')
       console.log(`Verified ${contract.name}: ${contract.address}`);
     }
 
-    // if (!fs.existsSync('logs')) {
-    //   fs.mkdirSync('logs');
-    // }
+    if (!fs.existsSync('logs')) {
+      fs.mkdirSync('logs');
+    }
 
-    // console.log(contracts.MosaicsPassToken.constructorArguments);
-
-    // fs.writeFileSync(
-    //   'logs/deploy.json',
-    //   JSON.stringify({
-    //     contractAddresses: {
-    //       MosaicsToken: contracts.MosaicsToken.address,
-    //       MosaicsPassToken: contracts.MosaicsPassToken.address,
-    //       // missing contract args
-    //     },
-    //     gitHub: {
-    //       // Get the commit sha when running in CI
-    //       sha: process.env.GITHUB_SHA,
-    //     },
-    //   }),
-    //   { flag: 'w' },
-    // );
+    fs.writeFileSync(
+      'logs/deploy.json',
+      JSON.stringify({
+        contractAddresses: {
+          MosaicsToken: contracts.MosaicsToken.address,
+          MosaicsPassToken: contracts.MosaicsPassToken.address,
+          MosaicsAuctionHouse: contracts.MosaicsAuctionHouse.address,
+          MosaicsAuctionHouseProxy: contracts.MosaicsAuctionHouseProxy.address,
+          MosaicsAuctionHouseProxyAdmin: contracts.MosaicsAuctionHouseProxyAdmin.address,
+        },
+        constructorArguments: {
+          MosaicsToken: contracts.MosaicsToken.constructorArguments,
+          MosaicsPassToken: contracts.MosaicsPassToken.constructorArguments,
+          MosaicsAuctionHouse: contracts.MosaicsAuctionHouse.constructorArguments,
+          MosaicsAuctionHouseProxy: contracts.MosaicsAuctionHouseProxy.constructorArguments,
+          MosaicsAuctionHouseProxyAdmin:
+            contracts.MosaicsAuctionHouseProxyAdmin.constructorArguments,
+        },
+        gitHub: {
+          // Get the commit sha when running in CI
+          sha: process.env.GITHUB_SHA,
+        },
+      }),
+      { flag: 'w' },
+    );
   });

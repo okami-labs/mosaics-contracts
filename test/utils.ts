@@ -1,14 +1,14 @@
-import { Block } from '@ethersproject/abstract-provider'
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import { ethers, network } from 'hardhat'
+import { Block } from '@ethersproject/abstract-provider';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { ethers, network } from 'hardhat';
 import {
   MosaicsPassToken,
   MosaicsPassToken__factory as MosaicsPassTokenFactory,
   MosaicsToken,
   MosaicsToken__factory as MosaicsTokenFactory,
   WETH,
-  WETH__factory as WethFactory
-} from '../typechain'
+  WETH__factory as WethFactory,
+} from '../typechain';
 
 export type TestSigners = {
   deployer: SignerWithAddress;

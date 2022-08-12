@@ -49,7 +49,7 @@ contract MosaicsPassToken is Ownable, ERC721A, ReentrancyGuard {
     string private _contractURI = 'https://mosaics-metadata.appspot.com/map/contract/metadata';
 
     // Base URI for the Mosaics Pass Token
-    string private _mosaicsPassBaseURI = 'ipfs://<TODO>';
+    string private _mosaicsPassBaseURI = 'https://mosaics-metadata.appspot.com/map/contract/base';
 
     constructor(
         uint256 _maxSupply,
