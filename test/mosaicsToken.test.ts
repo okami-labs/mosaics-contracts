@@ -45,7 +45,7 @@ describe('MosaicsPassToken', () => {
   describe('contractURI', async () => {
     it('should return correct contractURI', async () => {
       expect(await mosaicsToken.contractURI()).to.eq(
-        'ipfs://QmX6FPXtrS7nPodsevxgucu2oPhNXKPnob7YESzZDKiRQ5',
+        'ipfs://',
       );
     });
   });
