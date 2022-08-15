@@ -327,7 +327,7 @@ describe('MosaicsPassToken', () => {
   describe('contractURI', async () => {
     it('should return correct contractURI', async () => {
       expect(await mosaicsPassToken.contractURI()).to.eq(
-        'https://mosaics-metadata.appspot.com/map/contract/metadata',
+        '',
       );
     });
     it('should allow owner to set contractURI', async () => {
