@@ -33,10 +33,10 @@ contract MosaicsToken is IMosaicsToken, Ownable, ERC721URIStorage {
     bool public isMinterLocked;
 
     // IPFS content hash of the contract-level metadata
-    string private _contractURIHash = 'QmX6FPXtrS7nPodsevxgucu2oPhNXKPnob7YESzZDKiRQ5';
+    string private _contractURIHash = '';
 
     // IPFS hash of the default mosaic image, before the auction ends.
-    string private _defaultMosaicURIHash = 'QmX6FPXtrS7nPodsevxgucu2oPhNXKPnob7YESzZDKiRQ5'; // TODO: Update this
+    string private _defaultMosaicURIHash = ''; // TODO: Update this
 
     // IPFS hashes of the mosaic images, set by the owner after the auction ends.
     mapping(uint256 => string) public mosaics;
