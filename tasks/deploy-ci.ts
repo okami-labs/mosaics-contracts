@@ -23,18 +23,6 @@ task('deploy-ci', 'Deploy contracts (automated by CI)')
       autoDeploy: true,
     });
 
-    console.log('Waiting for etherscan to index. Sleeping for 60 seconds...');
-    await sleep(60 * 1000);
-
-    for (const [, contract] of Object.entries(contracts)) {
-      console.log(`Verifying ${contract.name}: ${contract.address}`);
-      await run('verify:verify', {
-        address: contract.address,
-        constructorArguments: contract.constructorArguments,
-      });
-      console.log(`Verified ${contract.name}: ${contract.address}`);
-    }
-
     if (!fs.existsSync('logs')) {
       fs.mkdirSync('logs');
     }
@@ -61,7 +49,25 @@ task('deploy-ci', 'Deploy contracts (automated by CI)')
           // Get the commit sha when running in CI
           sha: process.env.GITHUB_SHA,
         },
-      }),
-      { flag: 'w' },
+      }, null, 2),
+      { flag: 'w'},
     );
+
+    console.log('Waiting for etherscan to index. Sleeping for 60 seconds...');
+    await sleep(60 * 1000);
+
+    for (const [, contract] of Object.entries(contracts)) {
+      try {
+        console.log(`Verifying ${contract.name}: ${contract.address}`);
+        await run('verify:verify', {
+          address: contract.address,
+          contract: `contracts/${contract.name.includes("Proxy") ? "proxies/": ""}${contract.name}.sol:${contract.name}`,
+          constructorArguments: contract.constructorArguments,
+        });
+        console.log(`Verified ${contract.name}: ${contract.address}`);
+      } catch (e) {
+        console.error(`Failed to verify ${contract.name}: ${contract.address}`);
+        console.error(e);
+      }
+    }
   });

@@ -14,6 +14,7 @@
     "hardhat": "npx hardhat",
     "task:accounts": "npx hardhat accounts",
     "task:deploy": "npx hardhat deploy",
+    "task:deploy-rinkeby": "npx hardhat deploy-ci --network rinkeby",
     "task:deploy-and-configure": "npx hardhat deploy-and-configure",
     "task:mint-mosaic": "npx hardhat mint-mosaic",
     "task:mint-mosaics-pass": "npx hardhat mint-mosaics-pass",
