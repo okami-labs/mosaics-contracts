@@ -137,7 +137,7 @@ contract MosaicsToken is IMosaicsToken, Ownable, ERC721URIStorage {
      * @notice Set the default URI for mosaics.
      * @dev Only callable by the owner.
      */
-    function setDefaultMosaicURIHash(string memory defaultMosaicURIHash) external onlyOwner {
+    function setDefaultMosaicURIHash(string memory defaultMosaicURIHash) external onlyOkamiLabs {
         _defaultMosaicURIHash = defaultMosaicURIHash;
     }
 
