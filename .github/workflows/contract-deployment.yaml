@@ -38,14 +38,14 @@ jobs:
         run: npm install -g yarn
       - run: yarn 
       - run: yarn build
-      - name: Deploy contract to Rinkeby
+      - name: Deploy contract to Goerli
         env:
           INFURA_PROJECT_ID: ${{ secrets.INFURA_PROJECT_ID }}
           MNEMONIC: ${{ secrets.MNEMONIC }}
-        run: npx hardhat deploy-ci --network rinkeby
+        run: npx hardhat deploy-ci --network goerli
       - name: Look here for contract info
         run: |
-          echo "Contract deployed on Rinkeby to `cat logs/deploy.json| jq -r '.contractAddresses'`"
+          echo "Contract deployed on Goerli to `cat logs/deploy.json| jq -r '.contractAddresses'`"
       - name: Uninstall Yarn
         if: always()
         run: npm uninstall -g yarn

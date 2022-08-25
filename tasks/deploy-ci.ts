@@ -21,6 +21,7 @@ task('deploy-ci', 'Deploy contracts (automated by CI)')
       mosaicsDAO: mosaicsDAO.address,
       okamiLabs: okamiLabs.address,
       autoDeploy: true,
+      auctionDuration: 30 * 60,
     });
 
     if (!fs.existsSync('logs')) {

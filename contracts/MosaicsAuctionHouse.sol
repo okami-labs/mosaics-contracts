@@ -159,7 +159,7 @@ contract MosaicsAuctionHouse is
      */
     function setReservePrice(uint256 _reservePrice) external override onlyOwner {
         reservePrice = _reservePrice;
-
+ 
         emit AuctionReservePriceUpdated(_reservePrice);
     }
 

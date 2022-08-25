@@ -62,5 +62,5 @@ yarn task:run-local
 
 ### Automated Testnet Deployments
 
-The contracts are deployed to Rinkeby on each push to master and each PR using the account `<TODO>`. This account's mnemonic is stored in GitHub Actions as a secret and is injected as the environment variable `MNEMONIC`. This mnemonic _shouldn't be considered safe for mainnet use_.
+The contracts are deployed to Goerli on each push to master and each PR using the account `<TODO>`. This account's mnemonic is stored in GitHub Actions as a secret and is injected as the environment variable `MNEMONIC`. This mnemonic _shouldn't be considered safe for mainnet use_.
 ```
