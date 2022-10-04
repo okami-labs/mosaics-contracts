@@ -11,7 +11,7 @@ task('mint-mosaics-pass', 'Mints a Mosaic Pass')
     const nftFactory = await ethers.getContractFactory('MosaicsPassToken');
     const nftContract = await nftFactory.attach(token);
 
-    const receipt = await (await nftContract.publicSaleMint(1)).wait();
+    const receipt = await (await nftContract.mintFreePassPublic()).wait();
 
     console.log(receipt);
   });

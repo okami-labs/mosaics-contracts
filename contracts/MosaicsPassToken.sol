@@ -15,23 +15,26 @@ pragma solidity ^0.8.6;
 
 import { Ownable } from '@openzeppelin/contracts/access/Ownable.sol';
 import { ReentrancyGuard } from '@openzeppelin/contracts/security/ReentrancyGuard.sol';
+import { MerkleProof } from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import 'erc721a/contracts/IERC721A.sol';
 import 'erc721a/contracts/ERC721A.sol';
 
 contract MosaicsPassToken is Ownable, ERC721A, ReentrancyGuard {
     struct SaleConfig {
-        uint32 publicSaleStartTime;
-        uint64 publicPrice;
-        uint32 publicSaleBatchSize;
-        uint32 allowListStartTime;
-        uint64 allowListPrice;
+        bool publicSaleEnabled;
+        bool privateSaleEnabled;
+        uint64 premiumPassSalePrice;
+        uint32 batchSize;
     }
 
     // Configuration for sale price and start
     SaleConfig public saleConfig;
 
-    // The mapping of address to number of mints allowed
-    mapping(address => uint256) public allowList;
+    // addresses that minted premium
+    mapping(address => uint32) public premiumMinters;
+
+    // Merkle root for allow list
+    bytes32 public allowListMerkleRoot;
 
     // The Okami Labs address
     address public okamiLabs;
@@ -54,53 +57,89 @@ contract MosaicsPassToken is Ownable, ERC721A, ReentrancyGuard {
     constructor(
         uint256 _maxSupply,
         uint32 _amountForOkami,
-        address _okamiLabs
+        address _okamiLabs,
+        bytes32 _allowListMerkleRoot
     ) ERC721A('Mosaics Access Pass', 'MAP') {
         maxSupply = _maxSupply;
         amountForOkami = _amountForOkami;
         okamiLabs = _okamiLabs;
+        allowListMerkleRoot = _allowListMerkleRoot;
         require(amountForOkami <= maxSupply, 'MosaicsPassToken: Amount exceeds max supply.');
     }
+
+    event PremiumPassMinted(address indexed minter, uint32 quantity);
+    event FreePassMinted(address indexed minter, uint32 quantity);
 
     ///// Minting Functions
 
     /**
-     * @notice Mint a Mosaics Pass for the allow list sale.
+     * @dev Mints a batch of tokens to the caller.
+     * Caller can only mint one per transaction.
+     * There is no benefit to owning more than one free pass.
      */
-    function allowListMint(uint32 quantity) external payable callerIsUser {
-        SaleConfig memory config = saleConfig;
-        uint256 allowlistPrice = uint256(config.allowListPrice);
-        uint256 allowListStartTime = uint256(config.allowListStartTime);
-
-        require(saleStarted(allowListStartTime), 'MosaicsPassToken: Allowlist sale has not started yet.');
-        require(allowList[msg.sender] > 0, 'MosaicsPassToken: Not eligible for allowlist mint.');
-        require(allowList[msg.sender] - quantity >= 0, 'MosaicsPassToken: Quantity exceeds allowed mints.');
-        require(totalSupply() + quantity <= maxSupply, 'MosaicsPassToken: Minting would exceed max supply.');
-
-        allowList[msg.sender] -= quantity;
-
-        _mint(msg.sender, quantity);
-
-        refundIfOver(allowlistPrice * quantity);
+    function mintFreePass() internal {
+        require(totalSupply() + 1 <= maxSupply, 'MosaicsPassToken: Minting would exceed max supply.');
+        _safeMint(msg.sender, 1);
+        emit FreePassMinted(msg.sender, 1);
     }
 
     /**
-     * @notice Mint a Mosaics Pass for the public sale.
-     * @dev Caller cannot be a contract.
+     * @dev Mints a premium pass to the caller.
      */
-    function publicSaleMint(uint32 quantity) external payable callerIsUser {
+    function mintPremiumPass(uint32 quantity) internal {
         SaleConfig memory config = saleConfig;
-        uint256 publicPrice = uint256(config.publicPrice);
-        uint256 publicSaleStartTime = uint256(config.publicSaleStartTime);
-        uint256 publicSaleBatchSize = uint32(config.publicSaleBatchSize);
-
-        require(saleStarted(publicSaleStartTime), 'MosaicsPassToken: Public Sale has not started yet.');
-        require(quantity <= publicSaleBatchSize, 'MosaicsPassToken: Quantity would exceed public sale batch size.');
+        uint256 salePrice = uint256(config.premiumPassSalePrice);
+        uint32 batchSize = uint32(config.batchSize);
+        require(quantity <= batchSize, 'MosaicsPassToken: Quantity exceeds allowed mints.');
         require(totalSupply() + quantity <= maxSupply, 'MosaicsPassToken: Minting would exceed max supply.');
+        require(premiumMinters[msg.sender] + quantity <= batchSize, 'MosaicsPassToken: Exceeds max mints per address.');
+        premiumMinters[msg.sender] += quantity;
+        _mint(msg.sender, quantity);
+        refundIfOver(salePrice * quantity);
+        emit PremiumPassMinted(msg.sender, quantity);
+    }
 
-        _safeMint(msg.sender, quantity);
+    /**
+     * @notice Mint a premium Mosaics Pass for the public sale.
+     */
+    function mintPremiumPassPublic(uint32 quantity) external payable callerIsUser {
+        SaleConfig memory config = saleConfig;
+        bool publicSaleEnabled = bool(config.publicSaleEnabled);
+        require(publicSaleEnabled, 'MosaicsPassToken: Public sale has not started yet.');
+        mintPremiumPass(quantity);
+    }
 
-        refundIfOver(publicPrice * quantity);
+    /**
+     * @notice Mint a premium Mosaics Pass for the private sale.
+     */
+    function mintPremiumPassPrivate(uint32 quantity, bytes32[] calldata proof) external payable callerIsUser {
+        SaleConfig memory config = saleConfig;
+        bool privateSaleEnabled = bool(config.privateSaleEnabled);
+        require(privateSaleEnabled, 'MosaicsPassToken: Allowlist sale has not started yet.');
+        require(isAllowlisted(proof), 'MosaicsPassToken: Not eligible for allowlist mint.');
+        mintPremiumPass(quantity);
+    }
+
+    /**
+     * @notice Mint a free Mosaics Pass for the public sale.
+     */
+    function mintFreePassPublic() external callerIsUser {
+        SaleConfig memory config = saleConfig;
+        bool publicSaleEnabled = bool(config.publicSaleEnabled);
+        require(publicSaleEnabled, 'MosaicsPassToken: Public Sale has not started yet.');
+        mintFreePass();
+    }
+    
+    /**
+     * @notice Mint a free Mosaics Pass for the private sale.
+     * Minting a free pass does not prevent the user from minting a premium pass.
+     */
+    function mintFreePassPrivate(bytes32[] calldata proof) external callerIsUser {
+        SaleConfig memory config = saleConfig;
+        bool privateSaleEnabled = bool(config.privateSaleEnabled);
+        require(privateSaleEnabled, 'MosaicsPassToken: AllowList Sale has not started yet.');
+        require(isAllowlisted(proof), 'MosaicsPassToken: Not eligible for allowlist mint.');
+        mintFreePass();
     }
 
     /**
@@ -154,18 +193,16 @@ contract MosaicsPassToken is Ownable, ERC721A, ReentrancyGuard {
      * @dev Only callable by the owner.
      */
     function setSaleConfig(
-        uint32 publicSaleStartTime,
-        uint64 publicPrice,
-        uint32 publicSaleBatchSize,
-        uint32 allowListStartTime,
-        uint64 allowListPrice
+        bool publicSaleEnabled,
+        bool privateSaleEnabled,
+        uint64 premiumPassSalePrice,
+        uint32 batchSize
     ) external onlyOwner {
         saleConfig = SaleConfig(
-            publicSaleStartTime,
-            publicPrice,
-            publicSaleBatchSize,
-            allowListStartTime,
-            allowListPrice
+            publicSaleEnabled,
+            privateSaleEnabled,
+            premiumPassSalePrice,
+            batchSize
         );
     }
 
@@ -196,25 +233,19 @@ contract MosaicsPassToken is Ownable, ERC721A, ReentrancyGuard {
     }
 
     /**
-     * @notice Check if the current block is after the start time.
+     * @notice Require that the caller is in the allowList.
      */
-    function saleStarted(uint256 startTime) internal view returns (bool) {
-        return startTime > 0 && block.timestamp >= startTime;
+    function isAllowlisted(bytes32[] calldata proof) public view returns (bool) {
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        return MerkleProof.verify(proof, allowListMerkleRoot, leaf);
     }
 
     /**
-     * @notice Set the allowList address and number of mints allowed for each address.
-     * @dev Only callable by the owner. Addresses and number of mints allowed must be the same length.
+     * @notice Set the allowListMerkleRoot.
+     * @dev Only callable by the owner.
      */
-    function setAllowList(address[] memory addresses, uint32[] memory mintsAllowed) external onlyOwner {
-        require(
-            addresses.length == mintsAllowed.length,
-            'MosaicsPassToken: Number of addresses does not match mints allowed.'
-        );
-
-        for (uint256 i = 0; i < addresses.length; i++) {
-            allowList[addresses[i]] = mintsAllowed[i];
-        }
+    function updateAllowList(bytes32 newRoot) external onlyOwner {
+        allowListMerkleRoot = newRoot;
     }
 
     /**

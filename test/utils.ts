@@ -7,7 +7,7 @@ import {
   MosaicsToken,
   MosaicsToken__factory as MosaicsTokenFactory,
   WETH,
-  WETH__factory as WethFactory,
+  WETH__factory as WethFactory
 } from '../typechain';
 
 export type TestSigners = {
@@ -32,10 +32,11 @@ export const deployMosaicsPassToken = async (
   maxSupply: number,
   amountForOkami: number,
   okamiLabs: SignerWithAddress,
+  merkleRoot: string,
 ): Promise<MosaicsPassToken> => {
   const factory = new MosaicsPassTokenFactory(deployer);
 
-  return factory.deploy(maxSupply, amountForOkami, okamiLabs.address);
+  return factory.deploy(maxSupply, amountForOkami, okamiLabs.address, merkleRoot);
 };
 
 export const deployMosaicsToken = async (
@@ -60,28 +61,6 @@ export const MintMosaics = (token: MosaicsToken): ((amount: number) => Promise<v
     for (let i = 0; i < amount; i++) {
       await token.mint();
     }
-  };
-};
-
-export const MintMosaicsPassPublic = (
-  token: MosaicsPassToken,
-): ((amount: number) => Promise<void>) => {
-  return async (amount: number): Promise<void> => {
-    await token.publicSaleMint(amount);
-  };
-};
-
-export const MintMosaicsPassAllowlist = (
-  token: MosaicsPassToken,
-): ((amount: number) => Promise<void>) => {
-  return async (amount: number): Promise<void> => {
-    await token.allowListMint(amount);
-  };
-};
-
-export const MintMosaicsPassOkami = (token: MosaicsPassToken): (() => Promise<void>) => {
-  return async (): Promise<void> => {
-    await token.okamiMint();
   };
 };
 

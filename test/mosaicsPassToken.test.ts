@@ -1,8 +1,10 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import chai from 'chai';
 import { solidity } from 'ethereum-waffle';
-import { BigNumber as EthersBN, constants } from 'ethers';
+import { BigNumber as EthersBN, utils } from 'ethers';
 import { ethers } from 'hardhat';
+import keccak256 from 'keccak256';
+import { MerkleTree } from 'merkletreejs';
 import { MosaicsPassToken } from '../typechain';
 import { deployMosaicsPassToken } from './utils';
 
@@ -14,11 +16,19 @@ describe('MosaicsPassToken', () => {
   let deployer: SignerWithAddress;
   let okamiLabs: SignerWithAddress;
   let testMinter: SignerWithAddress;
+  let fakeMinter: SignerWithAddress;
   let snapshotId: number;
 
   before(async () => {
-    [deployer, okamiLabs, testMinter] = await ethers.getSigners();
-    mosaicsPassToken = await deployMosaicsPassToken(deployer, 51, 50, okamiLabs);
+    [deployer, okamiLabs, testMinter, fakeMinter] = await ethers.getSigners();
+    let allowlist = [
+      testMinter.address,
+    ];
+  
+    let leaves = allowlist.map((address) => keccak256(address));
+    let merkleTree = new MerkleTree(leaves, keccak256, { sortPairs: true });
+    let merkleRoot = merkleTree.getHexRoot();
+    mosaicsPassToken = await deployMosaicsPassToken(deployer, 51, 50, okamiLabs, merkleRoot);
   });
 
   beforeEach(async () => {
@@ -39,32 +49,25 @@ describe('MosaicsPassToken', () => {
 
   it('should set sale config', async () => {
     const saleConfig = {
-      publicSaleStartTime: constants.Zero,
-      publicPrice: EthersBN.from(1),
-      publicSaleBatchSize: EthersBN.from(1),
-      allowListStartTime: constants.Zero,
-      allowListPrice: EthersBN.from(1),
+      publicSaleEnabled: false,
+      privateSaleEnabled: false,
+      premiumPassSalePrice: utils.parseEther('0.02'),
+      batchSize: EthersBN.from(3),
     };
 
     await mosaicsPassToken.setSaleConfig(
-      saleConfig.publicSaleStartTime,
-      saleConfig.publicPrice,
-      saleConfig.publicSaleBatchSize,
-      saleConfig.allowListStartTime,
-      saleConfig.allowListPrice,
+      saleConfig.publicSaleEnabled,
+      saleConfig.privateSaleEnabled,
+      saleConfig.premiumPassSalePrice,
+      saleConfig.batchSize,
     );
 
     const actualSaleConfig = await mosaicsPassToken.saleConfig();
-    expect(actualSaleConfig.publicSaleStartTime).to.eq(saleConfig.publicSaleStartTime);
-    expect(actualSaleConfig.publicPrice).to.eq(saleConfig.publicPrice);
-    expect(actualSaleConfig.publicSaleBatchSize).to.eq(saleConfig.publicSaleBatchSize);
-    expect(actualSaleConfig.allowListStartTime).to.eq(saleConfig.allowListStartTime);
-    expect(actualSaleConfig.allowListPrice).to.eq(saleConfig.allowListPrice);
+    expect(actualSaleConfig.publicSaleEnabled).to.eq(saleConfig.publicSaleEnabled);
+    expect(actualSaleConfig.privateSaleEnabled).to.eq(saleConfig.privateSaleEnabled);
+    expect(actualSaleConfig.premiumPassSalePrice).to.eq(saleConfig.premiumPassSalePrice);
+    expect(actualSaleConfig.batchSize).to.eq(saleConfig.batchSize);
   });
-
-  // it("should be able to withdraw", async () => {
-
-  // });
 
   it('should set baseURI', async () => {
     const testBaseURI = 'test_base_uri';
@@ -72,44 +75,60 @@ describe('MosaicsPassToken', () => {
   });
 
   it('should set allowlist', async () => {
-    const testAllowList = [testMinter.address];
+    let allowlist = [testMinter.address];
+    let leaves = allowlist.map((address) => keccak256(address));
+    let merkleTree = new MerkleTree(leaves, keccak256, { sortPairs: true });
+    let merkleRoot = merkleTree.getHexRoot();
+    let proof = merkleTree.getProof(leaves[0]).map((x) => x.data.toString('hex'))
+    await mosaicsPassToken.updateAllowList(merkleRoot);
 
-    const testMintsAllowed = [3];
+    const isAllowlisted = await mosaicsPassToken.connect(testMinter).isAllowlisted(proof);
+    expect(isAllowlisted).to.eq(true);
 
-    await mosaicsPassToken.setAllowList(testAllowList, testMintsAllowed);
+    let fakeAllowlist = [fakeMinter.address];
+    let fakeLeaves = fakeAllowlist.map((address) => keccak256(address));
+    let fakeMerkleTree = new MerkleTree(fakeLeaves, keccak256, { sortPairs: true });
+    let fakeProof = fakeMerkleTree.getProof(fakeLeaves[0]).map((x) => x.data.toString('hex'))
 
-    const numMints = await mosaicsPassToken.allowList(testMinter.address);
-    expect(numMints).to.eq(testMintsAllowed[0]);
+    const isFakeAllowlisted = await mosaicsPassToken.connect(fakeMinter).isAllowlisted(fakeProof);
+    expect(isFakeAllowlisted).to.eq(false);
   });
 
   it('should mint from allowlist', async () => {
-    const startTime = Math.floor(Date.now() / 1000) - 10000;
     const saleConfig = {
-      publicSaleStartTime: startTime, // convert to seconds
-      publicPrice: ethers.utils.parseEther('0.1'),
-      publicSaleBatchSize: 1,
-      allowListStartTime: startTime, // convert to seconds
-      allowListPrice: ethers.utils.parseEther('0.1'),
+      publicSaleEnabled: false,
+      privateSaleEnabled: true,
+      premiumPassSalePrice: utils.parseEther('0.02'),
+      batchSize: EthersBN.from(3),
     };
 
     await mosaicsPassToken.setSaleConfig(
-      saleConfig.publicSaleStartTime,
-      saleConfig.publicPrice,
-      saleConfig.publicSaleBatchSize,
-      saleConfig.allowListStartTime,
-      saleConfig.allowListPrice,
+      saleConfig.publicSaleEnabled,
+      saleConfig.privateSaleEnabled,
+      saleConfig.premiumPassSalePrice,
+      saleConfig.batchSize,
     );
 
-    const testAllowList = [testMinter.address];
-    const testAllowListMintsAllowed = [3];
-    await mosaicsPassToken.setAllowList(testAllowList, testAllowListMintsAllowed);
+    let allowlist = [testMinter.address];
+    let leaves = allowlist.map((address) => keccak256(address));
+    let merkleTree = new MerkleTree(leaves, keccak256, { sortPairs: true });
+    let merkleRoot = merkleTree.getHexRoot();
+    let proof = merkleTree.getProof(leaves[0]).map((x) => x.data.toString('hex'))
+    await mosaicsPassToken.updateAllowList(merkleRoot);
 
     await mosaicsPassToken
       .connect(testMinter)
-      .allowListMint(3, { value: ethers.utils.parseEther('0.3') });
+      .mintPremiumPassPrivate(3, proof, { value: ethers.utils.parseEther('0.02').mul(3) });
 
-    const balance = await mosaicsPassToken.balanceOf(testMinter.address);
+    let balance = await mosaicsPassToken.balanceOf(testMinter.address);
     expect(balance).to.eq(3);
+
+    await mosaicsPassToken
+    .connect(testMinter)
+    .mintFreePassPrivate(proof);
+
+    balance = await mosaicsPassToken.balanceOf(testMinter.address);
+    expect(balance).to.eq(4);
   });
 
   it('should mint to okami', async () => {
@@ -131,196 +150,142 @@ describe('MosaicsPassToken', () => {
     );
   });
 
-  it('should not mint if not on allowlist', async () => {
-    const startTime = Math.floor(Date.now() / 1000) - 10000;
-    const saleConfig = {
-      publicSaleStartTime: startTime, // convert to seconds
-      publicPrice: ethers.utils.parseEther('0.1'),
-      publicSaleBatchSize: 1,
-      allowListStartTime: startTime, // convert to seconds
-      allowListPrice: ethers.utils.parseEther('0.1'),
-    };
-
-    await mosaicsPassToken.setSaleConfig(
-      saleConfig.publicSaleStartTime,
-      saleConfig.publicPrice,
-      saleConfig.publicSaleBatchSize,
-      saleConfig.allowListStartTime,
-      saleConfig.allowListPrice,
-    );
-
-    await expect(
-      mosaicsPassToken.allowListMint(3, { value: ethers.utils.parseEther('0.3') }),
-    ).to.be.revertedWith('MosaicsPassToken: Not eligible for allowlist mint.');
-  });
-
   it('should mint from public sale', async () => {
-    const startTime = Math.floor(Date.now() / 1000) - 10000;
     const saleConfig = {
-      publicSaleStartTime: startTime, // convert to seconds
-      publicPrice: ethers.utils.parseEther('0.1'),
-      publicSaleBatchSize: 1,
-      allowListStartTime: startTime, // convert to seconds
-      allowListPrice: ethers.utils.parseEther('0.1'),
+      publicSaleEnabled: true,
+      privateSaleEnabled: false,
+      premiumPassSalePrice: utils.parseEther('0.02'),
+      batchSize: EthersBN.from(3),
     };
 
     await mosaicsPassToken.setSaleConfig(
-      saleConfig.publicSaleStartTime,
-      saleConfig.publicPrice,
-      saleConfig.publicSaleBatchSize,
-      saleConfig.allowListStartTime,
-      saleConfig.allowListPrice,
+      saleConfig.publicSaleEnabled,
+      saleConfig.privateSaleEnabled,
+      saleConfig.premiumPassSalePrice,
+      saleConfig.batchSize,
     );
 
     await mosaicsPassToken
       .connect(testMinter)
-      .publicSaleMint(1, { value: ethers.utils.parseEther('0.1') });
+      .mintPremiumPassPublic(1, { value: ethers.utils.parseEther('0.02') });
 
-    const balance = await mosaicsPassToken.balanceOf(testMinter.address);
+    let balance = await mosaicsPassToken.balanceOf(testMinter.address);
     expect(balance).to.eq(1);
+
+    await mosaicsPassToken
+      .connect(testMinter)
+      .mintFreePassPublic();
+
+    balance = await mosaicsPassToken.balanceOf(testMinter.address);
+    expect(balance).to.eq(2);
   });
 
   it('should not mint before public sale has started', async () => {
-    const startTime = Math.floor(Date.now() / 1000) + 10000;
     const saleConfig = {
-      publicSaleStartTime: startTime, // convert to seconds
-      publicPrice: ethers.utils.parseEther('0.1'),
-      publicSaleBatchSize: 1,
-      allowListStartTime: startTime, // convert to seconds
-      allowListPrice: ethers.utils.parseEther('0.1'),
+      publicSaleEnabled: false,
+      privateSaleEnabled: false,
+      premiumPassSalePrice: utils.parseEther('0.02'),
+      batchSize: EthersBN.from(3),
     };
 
     await mosaicsPassToken.setSaleConfig(
-      saleConfig.publicSaleStartTime,
-      saleConfig.publicPrice,
-      saleConfig.publicSaleBatchSize,
-      saleConfig.allowListStartTime,
-      saleConfig.allowListPrice,
+      saleConfig.publicSaleEnabled,
+      saleConfig.privateSaleEnabled,
+      saleConfig.premiumPassSalePrice,
+      saleConfig.batchSize,
     );
 
     await expect(
       mosaicsPassToken
         .connect(testMinter)
-        .publicSaleMint(1, { value: ethers.utils.parseEther('0.1') }),
+        .mintFreePassPublic(),
     ).to.be.revertedWith('MosaicsPassToken: Public Sale has not started yet.');
   });
 
   it('should not mint before allowlist sale has started', async () => {
-    const startTime = Math.floor(Date.now() / 1000) + 10000;
     const saleConfig = {
-      publicSaleStartTime: startTime, // convert to seconds
-      publicPrice: ethers.utils.parseEther('0.1'),
-      publicSaleBatchSize: 1,
-      allowListStartTime: startTime, // convert to seconds
-      allowListPrice: ethers.utils.parseEther('0.1'),
+      publicSaleEnabled: false,
+      privateSaleEnabled: false,
+      premiumPassSalePrice: utils.parseEther('0.02'),
+      batchSize: EthersBN.from(3),
     };
 
     await mosaicsPassToken.setSaleConfig(
-      saleConfig.publicSaleStartTime,
-      saleConfig.publicPrice,
-      saleConfig.publicSaleBatchSize,
-      saleConfig.allowListStartTime,
-      saleConfig.allowListPrice,
+      saleConfig.publicSaleEnabled,
+      saleConfig.privateSaleEnabled,
+      saleConfig.premiumPassSalePrice,
+      saleConfig.batchSize,
     );
 
-    const allowList = [testMinter.address];
-    const allowListMintsAllowed = [3];
-    await mosaicsPassToken.setAllowList(allowList, allowListMintsAllowed);
+    let allowlist = [testMinter.address];
+    let leaves = allowlist.map((address) => keccak256(address));
+    let merkleTree = new MerkleTree(leaves, keccak256, { sortPairs: true });
+    let merkleRoot = merkleTree.getHexRoot();
+
+    await mosaicsPassToken.updateAllowList(merkleRoot);
+ 
+    let proof = merkleTree.getProof(leaves[0]).map((x) => x.data.toString('hex'))
 
     await expect(
       mosaicsPassToken
         .connect(testMinter)
-        .allowListMint(3, { value: ethers.utils.parseEther('0.3') }),
-    ).to.be.revertedWith('MosaicsPassToken: Allowlist sale has not started yet.');
+        .mintFreePassPrivate(proof),
+    ).to.be.revertedWith('MosaicsPassToken: AllowList Sale has not started yet.');
   });
 
   it('should revert if not enough eth sent', async () => {
-    const startTime = Math.floor(Date.now() / 1000) - 10000;
     const saleConfig = {
-      publicSaleStartTime: startTime, // convert to seconds
-      publicPrice: ethers.utils.parseEther('0.1'),
-      publicSaleBatchSize: 1,
-      allowListStartTime: startTime, // convert to seconds
-      allowListPrice: ethers.utils.parseEther('0.1'),
+      publicSaleEnabled: true,
+      privateSaleEnabled: false,
+      premiumPassSalePrice: utils.parseEther('0.02'),
+      batchSize: EthersBN.from(3),
     };
 
     await mosaicsPassToken.setSaleConfig(
-      saleConfig.publicSaleStartTime,
-      saleConfig.publicPrice,
-      saleConfig.publicSaleBatchSize,
-      saleConfig.allowListStartTime,
-      saleConfig.allowListPrice,
+      saleConfig.publicSaleEnabled,
+      saleConfig.privateSaleEnabled,
+      saleConfig.premiumPassSalePrice,
+      saleConfig.batchSize,
     );
-
-    const allowList = [testMinter.address];
-    const allowListMintsAllowed = [3];
-    await mosaicsPassToken.setAllowList(allowList, allowListMintsAllowed);
 
     await expect(
       mosaicsPassToken
         .connect(testMinter)
-        .allowListMint(3, { value: ethers.utils.parseEther('0.2') }),
+        .mintPremiumPassPublic(3, { value: ethers.utils.parseEther('0.02') }),
     ).to.be.revertedWith('MosaicsPassToken: Not enough ETH sent.');
   });
 
-  it('should mint if price is 0', async () => {
-    const startTime = Math.floor(Date.now() / 1000) - 10000;
-    const saleConfig = {
-      publicSaleStartTime: startTime, // convert to seconds
-      publicPrice: 0,
-      publicSaleBatchSize: 1,
-      allowListStartTime: startTime, // convert to seconds
-      allowListPrice: ethers.utils.parseEther('0.1'),
-    };
-
-    await mosaicsPassToken.setSaleConfig(
-      saleConfig.publicSaleStartTime,
-      saleConfig.publicPrice,
-      saleConfig.publicSaleBatchSize,
-      saleConfig.allowListStartTime,
-      saleConfig.allowListPrice,
-    );
-
-    await mosaicsPassToken
-      .connect(testMinter)
-      .publicSaleMint(1, { value: ethers.utils.parseEther('0') });
-  });
-
   it('should revert if not enough supply', async () => {
-    const startTime = Math.floor(Date.now() / 1000) - 10000;
     const saleConfig = {
-      publicSaleStartTime: startTime, // convert to seconds
-      publicPrice: 0,
-      publicSaleBatchSize: 3,
-      allowListStartTime: startTime, // convert to seconds
-      allowListPrice: ethers.utils.parseEther('0.1'),
+      publicSaleEnabled: true,
+      privateSaleEnabled: false,
+      premiumPassSalePrice: utils.parseEther('0.02'),
+      batchSize: EthersBN.from(3),
     };
 
     await mosaicsPassToken.setSaleConfig(
-      saleConfig.publicSaleStartTime,
-      saleConfig.publicPrice,
-      saleConfig.publicSaleBatchSize,
-      saleConfig.allowListStartTime,
-      saleConfig.allowListPrice,
+      saleConfig.publicSaleEnabled,
+      saleConfig.privateSaleEnabled,
+      saleConfig.premiumPassSalePrice,
+      saleConfig.batchSize,
     );
 
     // mint okami first, 50 supply, then try to mint 3
     await mosaicsPassToken.connect(okamiLabs).okamiMint();
 
-    const allowList = [testMinter.address];
-    const allowListMintsAllowed = [3];
-    await mosaicsPassToken.setAllowList(allowList, allowListMintsAllowed);
-
     await expect(
       mosaicsPassToken
         .connect(testMinter)
-        .allowListMint(3, { value: ethers.utils.parseEther('0.3') }),
+        .mintPremiumPassPublic(3, { value: ethers.utils.parseEther('0.02').mul(3) }),
     ).to.be.revertedWith('MosaicsPassToken: Minting would exceed max supply.');
 
+    // this should be fine, setting supply to 51, the next mint would fail
+    await mosaicsPassToken.connect(testMinter).mintFreePassPublic()
+    
     await expect(
       mosaicsPassToken
         .connect(testMinter)
-        .publicSaleMint(3, { value: ethers.utils.parseEther('0.3') }),
+        .mintFreePassPublic(),
     ).to.be.revertedWith('MosaicsPassToken: Minting would exceed max supply.');
   });
 
