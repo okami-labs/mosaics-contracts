@@ -32,11 +32,10 @@ export const deployMosaicsPassToken = async (
   maxSupply: number,
   amountForOkami: number,
   okamiLabs: SignerWithAddress,
-  merkleRoot: string,
 ): Promise<MosaicsPassToken> => {
   const factory = new MosaicsPassTokenFactory(deployer);
 
-  return factory.deploy(maxSupply, amountForOkami, okamiLabs.address, merkleRoot);
+  return factory.deploy(maxSupply, amountForOkami, okamiLabs.address);
 };
 
 export const deployMosaicsToken = async (

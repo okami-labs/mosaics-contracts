@@ -57,13 +57,11 @@ contract MosaicsPassToken is Ownable, ERC721A, ReentrancyGuard {
     constructor(
         uint256 _maxSupply,
         uint32 _amountForOkami,
-        address _okamiLabs,
-        bytes32 _allowListMerkleRoot
+        address _okamiLabs
     ) ERC721A('Mosaics Access Pass', 'MAP') {
         maxSupply = _maxSupply;
         amountForOkami = _amountForOkami;
         okamiLabs = _okamiLabs;
-        allowListMerkleRoot = _allowListMerkleRoot;
         require(amountForOkami <= maxSupply, 'MosaicsPassToken: Amount exceeds max supply.');
     }
 

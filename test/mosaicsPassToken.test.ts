@@ -25,10 +25,7 @@ describe('MosaicsPassToken', () => {
       testMinter.address,
     ];
   
-    let leaves = allowlist.map((address) => keccak256(address));
-    let merkleTree = new MerkleTree(leaves, keccak256, { sortPairs: true });
-    let merkleRoot = merkleTree.getHexRoot();
-    mosaicsPassToken = await deployMosaicsPassToken(deployer, 51, 50, okamiLabs, merkleRoot);
+    mosaicsPassToken = await deployMosaicsPassToken(deployer, 51, 50, okamiLabs);
   });
 
   beforeEach(async () => {
