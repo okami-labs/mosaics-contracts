@@ -16,6 +16,7 @@
     "task:deploy": "npx hardhat deploy",
     "task:deploy-goerli": "npx hardhat deploy-ci --network goerli",
     "task:deploy-and-configure": "npx hardhat deploy-and-configure",
+    "task:deploy-map-goerli": "npx hardhat deploy-map --network goerli",
     "task:mint-mosaic": "npx hardhat mint-mosaic",
     "task:mint-mosaics-pass": "npx hardhat mint-mosaics-pass",
     "task:run-local": "npx hardhat run-local",

@@ -81,7 +81,7 @@ task('deploy', 'Deploy Mosaics Contracts')
     >;
     const contracts: Record<ContractName, ContractDeployment> = {
       MosaicsPassToken: {
-        args: [1_000, 50, args.okamiLabs],
+        args: [10_000, args.okamiLabs],
       },
       MosaicsToken: {
         args: [args.mosaicsDAO, expectedAuctionHouseProxyAddress, args.okamiLabs],

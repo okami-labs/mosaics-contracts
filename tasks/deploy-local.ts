@@ -55,7 +55,7 @@ task('deploy-local', 'Deploy contracts to local hardhat node')
     const contracts: Record<LocalContractName, Contract> = {
       WETH: {},
       MosaicsPassToken: {
-        args: [1_000, 50, args.okamiLabs],
+        args: [10_000, args.okamiLabs],
       },
       MosaicsToken: {
         args: [args.mosaicsDAO, expectedAuctionHouseProxyAddress, args.okamiLabs],

@@ -24,7 +24,7 @@ contract MosaicsPassToken is Ownable, ERC721A, ReentrancyGuard {
         bool publicSaleEnabled;
         bool privateSaleEnabled;
         uint64 premiumPassSalePrice;
-        uint32 batchSize;
+        uint32 maxMintsPerAddress;
     }
 
     // Configuration for sale price and start
@@ -33,20 +33,20 @@ contract MosaicsPassToken is Ownable, ERC721A, ReentrancyGuard {
     // addresses that minted premium
     mapping(address => uint32) public premiumMinters;
 
+    // addresses that minted free
+    mapping(address => uint32) public freeMinters;
+
     // Merkle root for allow list
     bytes32 public allowListMerkleRoot;
 
     // The Okami Labs address
     address public okamiLabs;
 
-    // The supply reserved for Okami team
-    uint32 private amountForOkami;
+    // The maximum supply of premium passes that can be minted
+    uint256 public maxSupplyPremium;
 
-    // Flag when Okami has minted
-    bool private okamiMinted;
-
-    // The maximum supply that can be minted
-    uint256 public maxSupply;
+    // The number of free passes that have been minted so far
+    uint256 public totalPremiumMinted;
 
     // IPFS content hash of the contract-level metadata
     string private _contractURI = '';
@@ -54,47 +54,61 @@ contract MosaicsPassToken is Ownable, ERC721A, ReentrancyGuard {
     // Base URI for the Mosaics Pass Token
     string private _mosaicsPassBaseURI = '';
 
+    bool public freezeMinting;
+
     constructor(
-        uint256 _maxSupply,
-        uint32 _amountForOkami,
+        uint256 _maxSupplyPremium,
         address _okamiLabs
     ) ERC721A('Mosaics Access Pass', 'MAP') {
-        maxSupply = _maxSupply;
-        amountForOkami = _amountForOkami;
+        maxSupplyPremium = _maxSupplyPremium;
         okamiLabs = _okamiLabs;
-        require(amountForOkami <= maxSupply, 'MosaicsPassToken: Amount exceeds max supply.');
     }
 
-    event PremiumPassMinted(address indexed minter, uint32 quantity);
-    event FreePassMinted(address indexed minter, uint32 quantity);
-
-    ///// Minting Functions
+    /**
+     * @dev Used on the mosaics backend to set premium tier metadata
+     */
+    event PremiumPassMinted(address to, uint256 startTokenId, uint32 quantity);
 
     /**
-     * @dev Mints a batch of tokens to the caller.
-     * Caller can only mint one per transaction.
-     * There is no benefit to owning more than one free pass.
+     * @dev Used on the backend to set free tier metadata
+     */
+    event FreePassMinted(address to, uint256 tokenId);
+
+    /*********************************************
+     *            MINTING FUNCTIONS              *
+     *********************************************/
+
+    /**
+     * @notice Mint a free pass to the caller
+     * @dev Can only mint one free pass per address
      */
     function mintFreePass() internal {
-        require(totalSupply() + 1 <= maxSupply, 'MosaicsPassToken: Minting would exceed max supply.');
+        uint256 nextTokenId = _nextTokenId();
+        require(freeMinters[msg.sender] == 0, 'MosaicsPassToken: Only one free pass per address.');
+        freeMinters[msg.sender] = 1;
         _safeMint(msg.sender, 1);
-        emit FreePassMinted(msg.sender, 1);
+        emit FreePassMinted(msg.sender, nextTokenId);
     }
 
     /**
-     * @dev Mints a premium pass to the caller.
+     * @notice Mint a premium pass to the caller
+     * @dev Can only mint one free pass per address
      */
     function mintPremiumPass(uint32 quantity) internal {
         SaleConfig memory config = saleConfig;
         uint256 salePrice = uint256(config.premiumPassSalePrice);
-        uint32 batchSize = uint32(config.batchSize);
-        require(quantity <= batchSize, 'MosaicsPassToken: Quantity exceeds allowed mints.');
-        require(totalSupply() + quantity <= maxSupply, 'MosaicsPassToken: Minting would exceed max supply.');
-        require(premiumMinters[msg.sender] + quantity <= batchSize, 'MosaicsPassToken: Exceeds max mints per address.');
+        uint32 maxMintsPerAddress = uint32(config.maxMintsPerAddress);
+        uint256 nextTokenId = _nextTokenId();
+
+        require(quantity <= maxMintsPerAddress, 'MosaicsPassToken: Quantity exceeds allowed mints.');
+        require(totalPremiumMinted + quantity <= maxSupplyPremium, 'MosaicsPassToken: Minting would exceed max supply.');
+        require(premiumMinters[msg.sender] + quantity <= maxMintsPerAddress, 'MosaicsPassToken: Exceeds max mints per address.');
+       
         premiumMinters[msg.sender] += quantity;
         _mint(msg.sender, quantity);
         refundIfOver(salePrice * quantity);
-        emit PremiumPassMinted(msg.sender, quantity);
+       
+        emit PremiumPassMinted(msg.sender, nextTokenId, quantity);
     }
 
     /**
@@ -141,18 +155,19 @@ contract MosaicsPassToken is Ownable, ERC721A, ReentrancyGuard {
     }
 
     /**
-     * @notice Mints the supply of Mosaic Passes reserved for Okami.
+     * @notice Mints the supply of Mosaic Passes reserved for the Okami Labs team.
      * @dev Only callable by the owner.
      */
-    function okamiMint() external {
-        require(msg.sender == okamiLabs, 'MosaicsPassToken: Only Okami Labs can mint.');
-        require(!okamiMinted, 'MosaicsPassToken: Okami has already minted.');
-        require(totalSupply() + amountForOkami <= maxSupply, 'MosaicsPassToken: Minting would exceed max supply.');
-        _safeMint(msg.sender, amountForOkami);
-        okamiMinted = true;
+    function teamMint(address to, uint32 quantity) external onlyOwner {
+        require(totalPremiumMinted + quantity <= maxSupplyPremium, 'MosaicsPassToken: Minting would exceed max supply.');
+        uint256 nextTokenId = _nextTokenId();
+        _safeMint(to, quantity);
+        emit PremiumPassMinted(to, nextTokenId, quantity);
     }
 
-    ///// Metadata Functions
+    /*********************************************
+     *            METADATA FUNCTIONS             *
+     *********************************************/
 
     /**
      * @notice Return the Mosaic Pass base URI.
@@ -184,7 +199,9 @@ contract MosaicsPassToken is Ownable, ERC721A, ReentrancyGuard {
         _contractURI = contractURI_;
     }
 
-    ///// Sale Functions
+    /*********************************************
+     *              SALE FUNCTIONS               *
+     *********************************************/
 
     /**
      * @notice Set the sales config.
@@ -194,17 +211,31 @@ contract MosaicsPassToken is Ownable, ERC721A, ReentrancyGuard {
         bool publicSaleEnabled,
         bool privateSaleEnabled,
         uint64 premiumPassSalePrice,
-        uint32 batchSize
+        uint32 maxMintsPerAddress
     ) external onlyOwner {
+        require(freezeMinting == false, 'MosaicsPassToken: Sale config is frozen.');
+
         saleConfig = SaleConfig(
             publicSaleEnabled,
             privateSaleEnabled,
             premiumPassSalePrice,
-            batchSize
+            maxMintsPerAddress
         );
     }
 
-    ///// Misc. Functions
+    /**
+     * @notice Freeze the sale config, and disables minting.
+     * @dev Only callable by the owner. This should only be called
+     * after the sale has ended.
+     */
+    function freezeSaleConfig() external onlyOwner {
+        freezeMinting = true;
+        saleConfig = SaleConfig(false, false, 0, 0);
+    }
+
+    /*********************************************
+     *              MISC. FUNCTIONS              *
+     *********************************************/
 
     /**
      * @notice Withdraw all funds from the contract.
