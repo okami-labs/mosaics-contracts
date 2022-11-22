@@ -32,8 +32,7 @@ task('deploy-map', 'Deploy Mosaics Pass Contract')
     const contract: ContractDeployment = {
       args: [        
         args.maxSupplyPremium,
-        args.amountForOkami,
-        args.okamiLabs
+        args.okamiLabs,
       ]
     }
 

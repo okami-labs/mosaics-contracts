@@ -24,7 +24,7 @@ task('deploy-local', 'Deploy contracts to local hardhat node')
     5,
     types.int,
   )
-  .addOptionalParam('auctionDuration', 'The auction duration (seconds)', 60 * 2, types.int) // default to 2 minutes
+  .addOptionalParam('auctionDuration', 'The auction duration (seconds)', 60 * 3, types.int) // default to 2 minutes
   .setAction(async (args, { ethers }) => {
     const network = await ethers.provider.getNetwork();
     if (network.chainId != 31337) {
